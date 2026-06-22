@@ -1,4 +1,9 @@
-﻿using win_backup.Helpers;
+﻿/*
+ * Win-Backup
+ * ProgressForm.cs
+ * Copyright (c) 2026 Arthur Taft. All Rights Reserved.
+*/
+using win_backup.Helpers;
 using win_backup.Models;
 using System;
 using System.Collections.Generic;

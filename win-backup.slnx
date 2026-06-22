@@ -1,3 +1,8 @@
+<!--
+Win-Backup
+win-backup.slnx
+Copyright (c) 2026 Arthur Taft. All Rights Reserved.
+-->
 <Solution>
   <Project Path="win-backup.csproj" />
 </Solution>

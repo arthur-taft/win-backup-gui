@@ -1,4 +1,9 @@
-﻿using win_backup.Helpers;
+﻿/*
+ * Win-Backup
+ * LogForm.cs
+ * Copyright (c) 2026 Arthur Taft. All Rights Reserved.
+*/
+using win_backup.Helpers;
 using System;
 using System.Collections.Generic;
 using System.Drawing;

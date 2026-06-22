@@ -1,4 +1,9 @@
-﻿namespace win_backup.Models
+﻿/*
+ * Win-Backup
+ * CopyProgress.cs
+ * Copyright (c) 2026 Arthur Taft. All Rights Reserved.
+*/
+namespace win_backup.Models
 {
     public class CopyProgress
     {

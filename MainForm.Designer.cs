@@ -1,4 +1,9 @@
-﻿namespace win_backup
+﻿/*
+ * Win-Backup
+ * MainForm.Designer.cs
+ * Copyright (c) 2026 Arthur Taft. All Rights Reserved.
+*/
+namespace win_backup
 {
     partial class MainForm
     {

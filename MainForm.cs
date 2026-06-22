@@ -1,3 +1,8 @@
+/*
+ * Win-Backup
+ * MainForm.cs
+ * Copyright (c) 2026 Arthur Taft. All Rights Reserved.
+*/
 using win_backup.Helpers;
 using win_backup.Models;
 using System.Collections.Generic;

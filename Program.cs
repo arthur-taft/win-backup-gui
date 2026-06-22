@@ -1,3 +1,8 @@
+/*
+ * Win-Backup
+ * Program.cs
+ * Copyright (c) 2026 Arthur Taft. All Rights Reserved.
+*/
 namespace win_backup
 {
     internal static class Program
