@@ -36,6 +36,8 @@ namespace win_backup
             label2 = new Label();
             cboDrive = new ComboBox();
             groupBox1 = new GroupBox();
+            btnRemovePath = new Button();
+            btnAddPath = new Button();
             clbLocations = new CheckedListBox();
             groupBox2 = new GroupBox();
             btnPreview = new Button();
@@ -68,13 +70,35 @@ namespace win_backup
             // 
             // groupBox1
             // 
+            groupBox1.Controls.Add(btnRemovePath);
+            groupBox1.Controls.Add(btnAddPath);
             groupBox1.Controls.Add(clbLocations);
             groupBox1.Location = new Point(12, 75);
             groupBox1.Name = "groupBox1";
-            groupBox1.Size = new Size(310, 360);
+            groupBox1.Size = new Size(310, 380);
             groupBox1.TabIndex = 2;
             groupBox1.TabStop = false;
             groupBox1.Text = "Backup Locations";
+            // 
+            // btnRemovePath
+            // 
+            btnRemovePath.Location = new Point(166, 343);
+            btnRemovePath.Name = "btnRemovePath";
+            btnRemovePath.Size = new Size(132, 28);
+            btnRemovePath.TabIndex = 2;
+            btnRemovePath.Text = "- Remove Selected";
+            btnRemovePath.UseVisualStyleBackColor = true;
+            btnRemovePath.Click += btnRemovePath_Click;
+            // 
+            // btnAddPath
+            // 
+            btnAddPath.Location = new Point(10, 343);
+            btnAddPath.Name = "btnAddPath";
+            btnAddPath.Size = new Size(151, 28);
+            btnAddPath.TabIndex = 1;
+            btnAddPath.Text = "+ Add Custom Path";
+            btnAddPath.UseVisualStyleBackColor = true;
+            btnAddPath.Click += btnAddPath_Click;
             // 
             // clbLocations
             // 
@@ -137,17 +161,17 @@ namespace win_backup
             btnStart.BackColor = Color.Green;
             btnStart.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             btnStart.ForeColor = Color.White;
-            btnStart.Location = new Point(12, 455);
+            btnStart.Location = new Point(12, 475);
             btnStart.Name = "btnStart";
             btnStart.Size = new Size(460, 40);
             btnStart.TabIndex = 4;
             btnStart.Text = "Start Backup";
             btnStart.UseVisualStyleBackColor = false;
-            btnStart.Click += this.btnStart_Click;
+            btnStart.Click += btnStart_Click;
             // 
             // btnExit
             // 
-            btnExit.Location = new Point(485, 455);
+            btnExit.Location = new Point(485, 475);
             btnExit.Name = "btnExit";
             btnExit.Size = new Size(82, 40);
             btnExit.TabIndex = 5;
@@ -157,7 +181,7 @@ namespace win_backup
             // 
             // MainForm
             // 
-            ClientSize = new Size(584, 501);
+            ClientSize = new Size(584, 521);
             Controls.Add(btnExit);
             Controls.Add(btnStart);
             Controls.Add(groupBox2);
@@ -188,5 +212,7 @@ namespace win_backup
         private CheckBox chkLargeFileAudit;
         private Button btnStart;
         private Button btnExit;
+        private Button btnRemovePath;
+        private Button btnAddPath;
     }
 }
