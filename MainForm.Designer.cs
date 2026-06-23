@@ -33,6 +33,7 @@ namespace win_backup
         /// </summary>
         private void InitializeComponent()
         {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
             label2 = new Label();
             cboDrive = new ComboBox();
             groupBox1 = new GroupBox();
@@ -202,6 +203,7 @@ namespace win_backup
             Controls.Add(cboDrive);
             Controls.Add(label2);
             FormBorderStyle = FormBorderStyle.FixedSingle;
+            Icon = (Icon)resources.GetObject("$this.Icon");
             MaximizeBox = false;
             Name = "MainForm";
             StartPosition = FormStartPosition.CenterScreen;
