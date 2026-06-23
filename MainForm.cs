@@ -15,6 +15,9 @@ namespace win_backup
 {
     public partial class MainForm : Form
     {
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern int SendMessage(IntPtr hWnd, uint msg, int wParam, int lParam);
+        private const uint BCM_SETSHIELD = 0x160C;
         // These are "fields" — data that the whole form can access
         private List<BackupItem> _backupItems;
         private Dictionary<string, DriveInfo> _driveMapping;
@@ -26,14 +29,18 @@ namespace win_backup
                 var drive = _driveMapping[cboDrive.SelectedItem.ToString()];
 
                 // RootDirectory returns "<DriveLetter>:\" - Trim end removes backslash
-                return Path.Combine(drive.RootDirectory.FullName.TrimEnd('\\'), Environment.UserName);
+                return Path.Combine(drive.RootDirectory.FullName.TrimEnd('\\'), _targetUser);
             }
         }
         private Dictionary<string, List<string>> _excludedFiles = new Dictionary<string, List<string>>();
-
-        public MainForm()
+        
+        private string _targetUser = Environment.UserName;
+        public MainForm(string[] args)
         {
             InitializeComponent(); // Always first — loads the Designer layout
+
+            btnDifferentUser.FlatStyle = FlatStyle.System;
+            SendMessage(btnDifferentUser.Handle, BCM_SETSHIELD, 0, 1);
 
             LoadDrives();          // Fill the drive dropdown
             LoadBackupLocations(); // Fill the locations checklist
@@ -53,13 +60,35 @@ namespace win_backup
 
         private void LoadBackupLocations()
         {
-            _backupItems = BackupEngine.BuildBackupItems();
+            _backupItems = BackupEngine.BuildBackupItems(_targetUser);
 
             clbLocations.Items.Clear();
             foreach (var item in _backupItems)
             {
                 int index = clbLocations.Items.Add(item.Name);
                 clbLocations.SetItemChecked(index, item.Enabled);
+            }
+        }
+        private void ShowUserPicker()
+        {
+            var users = BackupEngine.GetUserProfiles();
+
+            if (users.Count == 0)
+            {
+                MessageBox.Show("No user profiles found.", "No Users",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            // Simple selection via a small input dialog
+            using (var picker = new UserPickerForm(users, _targetUser))
+            {
+                if (picker.ShowDialog() == DialogResult.OK)
+                {
+                    _targetUser = picker.SelectedUser;
+                    Text = $"Backup Utility — Backing up: {_targetUser}";
+                    LoadBackupLocations(); // rebuild the list for the new user
+                }
             }
         }
 
@@ -209,6 +238,20 @@ namespace win_backup
 
             _backupItems.RemoveAt(selected);
             clbLocations.Items.RemoveAt(selected);
+        }
+
+        private void btnDifferentUser_Click(object sender, EventArgs e)
+        {
+            if (BackupEngine.IsElevated())
+            {
+                ShowUserPicker();
+                return;
+            }
+
+            if (BackupEngine.RelaunchElevated("--pickuser"))
+            {
+                Application.Exit();
+            }
         }
     }
 }

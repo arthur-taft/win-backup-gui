@@ -11,11 +11,73 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Security.Principal;
 
 namespace win_backup.Helpers
 {
     public static class BackupEngine
     {
+
+        // Returns true if the app is currently running with admin rights
+        public static bool IsElevated()
+        {
+            using (var identity = WindowsIdentity.GetCurrent())
+            {
+                var principal = new WindowsPrincipal(identity);
+                return principal.IsInRole(WindowsBuiltInRole.Administrator);
+            }
+        }
+
+        // Relaunches the current app elevated, passing along an argument.
+        // Returns true if the relaunch was started (so the caller can close itself).
+        public static bool RelaunchElevated(string argument)
+        {
+            var exePath = Process.GetCurrentProcess().MainModule.FileName;
+
+            var startInfo = new ProcessStartInfo(exePath)
+            {
+                UseShellExecute = true,   // required for the "runas" verb
+                Verb = "runas", // this is what triggers UAC
+                Arguments = argument
+            };
+
+            try
+            {
+                Process.Start(startInfo);
+                return true;
+            }
+            catch (System.ComponentModel.Win32Exception)
+            {
+                // User clicked "No" on the UAC prompt — Windows throws this
+                return false;
+            }
+        }
+
+        public static List<string> GetUserProfiles()
+        {
+            var users = new List<string>();
+            string usersRoot = @"C:\Users";
+
+            // These aren't real user accounts — skip them
+            var systemProfiles = new[] { "Public", "Default", "Default User", "All Users", "defaultuser0" };
+
+            if (!Directory.Exists(usersRoot)) return users;
+
+            foreach (var dir in Directory.GetDirectories(usersRoot))
+            {
+                string name = Path.GetFileName(dir);
+
+                if (systemProfiles.Contains(name, StringComparer.OrdinalIgnoreCase))
+                    continue;
+
+                // A real profile will have a Desktop or NTUSER.DAT — quick sanity check
+                if (File.Exists(Path.Combine(dir, "NTUSER.DAT")) || Directory.Exists(Path.Combine(dir, "Desktop")))
+                    users.Add(name);
+            }
+
+            return users;
+        }
+
         // Expose robocopy log path
         public static readonly string TempLogPath = Path.Combine(Path.GetTempPath(), "robo_migration.log");
 
@@ -41,33 +103,40 @@ namespace win_backup.Helpers
         }
 
         // Builds the list of backup items
-        public static List<BackupItem> BuildBackupItems()
+        public static List<BackupItem> BuildBackupItems(string username)
         {
             var items = new List<BackupItem>();
-            string sourceRoot = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            string sourceRoot = Path.Combine(@"C:\Users", username); // selected user, not current
 
             // Standard user folders
             foreach (var folder in new[] { "Desktop", "Documents", "Downloads", "Pictures", "Videos", "Music" })
             {
+                string fullPath = Path.Combine(sourceRoot, folder);
+                if (!Directory.Exists(fullPath)) continue; // skip folders that don't exist for this user
+
                 items.Add(new BackupItem
                 {
                     Name = folder,
-                    Src = Path.Combine(sourceRoot, folder),
+                    Src = fullPath,
                     Dest = folder,
                     Enabled = true
                 });
             }
 
             // Browser profiles
+            // Note we build AppData paths manually from the user's root
+            // because Environment.GetFolderPath() would give the CURRENT user's AppData
+            string localAppData = Path.Combine(sourceRoot, @"AppData\Local");
+            string roamingAppData = Path.Combine(sourceRoot, @"AppData\Roaming");
+
             items.AddRange(GetChromiumProfiles("Chrome",
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                @"Google\Chrome\User Data")));
+                Path.Combine(localAppData, @"Google\Chrome\User Data")));
 
             items.AddRange(GetChromiumProfiles("Edge",
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                @"Microsoft\Edge\User Data")));
+                Path.Combine(localAppData, @"Microsoft\Edge\User Data")));
 
-            items.AddRange(GetFirefoxProfiles());
+            items.AddRange(GetFirefoxProfiles(
+                Path.Combine(roamingAppData, @"Mozilla\Firefox\Profiles")));
 
             return items;
         }
@@ -96,12 +165,9 @@ namespace win_backup.Helpers
             return profiles;
         }
 
-        private static List<BackupItem> GetFirefoxProfiles()
+        private static List<BackupItem> GetFirefoxProfiles(string firefoxPath)
         {
             var profiles = new List<BackupItem>();
-            string firefoxPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                @"Mozilla\Firefox\Profiles");
 
             if (!Directory.Exists(firefoxPath)) return profiles;
 

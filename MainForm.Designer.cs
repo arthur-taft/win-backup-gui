@@ -45,6 +45,7 @@ namespace win_backup
             chkLargeFileAudit = new CheckBox();
             btnStart = new Button();
             btnExit = new Button();
+            btnDifferentUser = new Button();
             groupBox1.SuspendLayout();
             groupBox2.SuspendLayout();
             SuspendLayout();
@@ -73,16 +74,16 @@ namespace win_backup
             groupBox1.Controls.Add(btnRemovePath);
             groupBox1.Controls.Add(btnAddPath);
             groupBox1.Controls.Add(clbLocations);
-            groupBox1.Location = new Point(12, 75);
+            groupBox1.Location = new Point(12, 94);
             groupBox1.Name = "groupBox1";
-            groupBox1.Size = new Size(310, 380);
+            groupBox1.Size = new Size(310, 375);
             groupBox1.TabIndex = 2;
             groupBox1.TabStop = false;
             groupBox1.Text = "Backup Locations";
             // 
             // btnRemovePath
             // 
-            btnRemovePath.Location = new Point(166, 343);
+            btnRemovePath.Location = new Point(166, 341);
             btnRemovePath.Name = "btnRemovePath";
             btnRemovePath.Size = new Size(132, 28);
             btnRemovePath.TabIndex = 2;
@@ -92,7 +93,7 @@ namespace win_backup
             // 
             // btnAddPath
             // 
-            btnAddPath.Location = new Point(10, 343);
+            btnAddPath.Location = new Point(10, 341);
             btnAddPath.Name = "btnAddPath";
             btnAddPath.Size = new Size(151, 28);
             btnAddPath.TabIndex = 1;
@@ -179,9 +180,21 @@ namespace win_backup
             btnExit.UseVisualStyleBackColor = true;
             btnExit.Click += btnExit_Click;
             // 
+            // btnDifferentUser
+            // 
+            btnDifferentUser.FlatStyle = FlatStyle.System;
+            btnDifferentUser.Location = new Point(12, 60);
+            btnDifferentUser.Name = "btnDifferentUser";
+            btnDifferentUser.Size = new Size(230, 28);
+            btnDifferentUser.TabIndex = 6;
+            btnDifferentUser.Text = "Back up a different user";
+            btnDifferentUser.UseVisualStyleBackColor = true;
+            btnDifferentUser.Click += btnDifferentUser_Click;
+            // 
             // MainForm
             // 
             ClientSize = new Size(584, 521);
+            Controls.Add(btnDifferentUser);
             Controls.Add(btnExit);
             Controls.Add(btnStart);
             Controls.Add(groupBox2);
@@ -214,5 +227,6 @@ namespace win_backup
         private Button btnExit;
         private Button btnRemovePath;
         private Button btnAddPath;
+        private Button btnDifferentUser;
     }
 }
