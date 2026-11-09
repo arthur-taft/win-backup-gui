@@ -30,6 +30,11 @@ namespace win_backup
         private readonly Dictionary<string, List<string>> _excludedFiles;
         private readonly bool _sizeCheckEnabled;
 
+        // Cancellation Logic
+        private readonly CancellationTokenSource _cts = new CancellationTokenSource();
+        private bool _running;
+        private Button _btnRetry;
+
         public ProgressForm(List<BackupItem> items, string destRoot, Dictionary<string, List<string>> excludedFiles, bool sizeCheckEnabled)
         {
             _items = items;
@@ -38,7 +43,21 @@ namespace win_backup
             _sizeCheckEnabled = sizeCheckEnabled;
 
             SetupForm();
-            Load += ProgressForm_Load;
+            Load += async (s, e) => await RunAsync(_items);
+
+            FormClosing += (s, e) =>
+            {
+                if (!_running) return;
+
+                var answer = MessageBox.Show(
+                    "A backup is still running. Stop it and close?",
+                    "Backup In Progress",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning);
+
+                if (answer == DialogResult.No) { e.Cancel = true; return; }
+                _cts.Cancel();
+            };
         }
 
         private void SetupForm()
@@ -126,6 +145,21 @@ namespace win_backup
                 _logForm = new LogForm();
                 _logForm.Show(this);
             };
+            _btnRetry = new Button
+            {
+                Text = "Retry Failed",
+                Size = new Size(110, 35),
+                Location = new Point(10, 8),
+                ForeColor = Color.DarkOrange,
+                Visible = false
+            };
+            _btnRetry.Click += async (s, e) =>
+            {
+                _btnRetry.Visible = false;
+                var failedItems = _items.Where(i => i.Enabled && i.LastExitCode >= 8).ToList();
+                await RunAsync(failedItems);
+            };
+            bottomPanel.Controls.Add(_btnRetry);
             bottomPanel.Controls.Add(_btnToggleLog);
             bottomPanel.Controls.Add(_btnClose);
             bottomPanel.Resize += (s, e) =>
@@ -145,36 +179,55 @@ namespace win_backup
         }
 
         // Fires automatically when the form opens
-        private async void ProgressForm_Load(object sender, EventArgs e)
+        private async Task RunAsync(List<BackupItem> itemsToRun)
         {
+            _running = true;
+            _btnClose.Enabled = false;
             var progress = new Progress<CopyProgress>(UpdateUI);
 
-            // RunBackup now returns the logs dictionary
-            var auditLogs = await Task.Run(() =>
-                BackupEngine.RunBackup(_items, _destRoot, _excludedFiles, progress));
-
-            _lblStatus.Text = "Backup complete!";
-            _lblStatus.ForeColor = Color.DarkGreen;
-            _lblCurrentFile.Text = "";
-
-            // --- Post-Copy Audit (mirrors your Phase 5) ---
-            if (_sizeCheckEnabled && auditLogs.Count > 0)
+            try
             {
-                _lblStatus.Text = "Auditing transfer logs...";
-                var failures = await Task.Run(() => BackupEngine.VerifyLogs(auditLogs));
-                _lblStatus.Text = "Backup complete!";
-                _lblStatus.ForeColor = Color.DarkGreen;
+                var auditLogs = await Task.Run(() =>
+                    BackupEngine.RunBackup(itemsToRun, _destRoot, _excludedFiles, progress, _cts.Token));
 
-                // Open as modal so the user reviews results before closing
-                new AuditForm(failures).ShowDialog(this);
+                if (_sizeCheckEnabled && auditLogs.Count > 0)
+                {
+                    _lblStatus.Text = "Auditing transfer logs...";
+                    var failures = await Task.Run(() => BackupEngine.VerifyLogs(auditLogs));
+                    new AuditForm(failures).ShowDialog(this);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                return; // the window is closing, so don't touch any controls
+            }
+            finally
+            {
+                _running = false;
             }
 
+            int failedCount = _items.Count(i => i.Enabled && i.LastExitCode >= 8);
+            if (failedCount > 0)
+            {
+                _lblStatus.Text = $"Finished with {failedCount} failed location(s)";
+                _lblStatus.ForeColor = Color.DarkOrange;
+                _btnRetry.Visible = true;
+            }
+            else
+            {
+                _lblStatus.Text = "✓ Backup complete!";
+                _lblStatus.ForeColor = Color.DarkGreen;
+            }
+
+            _lblCurrentFile.Text = "";
             _btnClose.Enabled = true;
         }
 
         // Called automatically by Progress<T> — always runs on UI thread
         private void UpdateUI(CopyProgress p)
         {
+            if (IsDisposed) return;
+
             _progressBar.Maximum = p.TotalItems;
             _progressBar.Value = Math.Min(p.ItemIndex, p.TotalItems);
 
@@ -198,6 +251,7 @@ namespace win_backup
                     "Copying" => Color.DarkBlue,
                     "Skipped" => Color.Gray,
                     "Not Found" => Color.DarkOrange,
+                    "Failed" => Color.Red,
                     _ => Color.Black
                 };
                 row.EnsureVisible(); // Auto-scroll to keep active item visible

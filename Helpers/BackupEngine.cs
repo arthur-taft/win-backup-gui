@@ -221,7 +221,8 @@ namespace win_backup.Helpers
             List<BackupItem> items,
             string destRoot,
             Dictionary<string, List<string>> excludedFiles,
-            IProgress<CopyProgress> progress)
+            IProgress<CopyProgress> progress,
+            CancellationToken token)
         {
             int threads = Environment.ProcessorCount;
             string tempLog = TempLogPath;
@@ -231,6 +232,8 @@ namespace win_backup.Helpers
 
             foreach (var item in items)
             {
+                token.ThrowIfCancellationRequested();
+
                 // --- Skipped / not found ---
                 if (!item.Enabled)
                 {
@@ -260,7 +263,7 @@ namespace win_backup.Helpers
                 {
                     $"\"{item.Src}\"",
                     $"\"{Path.Combine(destRoot, item.Dest)}\"",
-                    "/MIR", "/W:1", "/R:1", "/J",
+                    "/MIR", "/W:5", "/R:3", "/J",
                     $"/MT:{threads}",
                     "/NP", "/NDL",
                     $"/UNILOG:\"{tempLog}\""
@@ -284,6 +287,12 @@ namespace win_backup.Helpers
                 // --- Poll the log while robocopy runs ---
                 while (!process.HasExited)
                 {
+                    if (token.IsCancellationRequested)
+                    {
+                        try {  process.Kill(entireProcessTree: true); } catch { }
+                        token.ThrowIfCancellationRequested();
+                    }
+
                     if (File.Exists(tempLog))
                     {
                         try
@@ -317,10 +326,18 @@ namespace win_backup.Helpers
                     Thread.Sleep(150);
                 }
 
+                process.WaitForExit();
+                item.LastExitCode = process.ExitCode;
+                bool failed = process.ExitCode >= 8;
+
                 // --- Item done ---
                 completed++;
                 progress.Report(new CopyProgress
-                { ItemName = item.Name, Status = "Complete", ItemIndex = completed, TotalItems = totalEnabled });
+                { ItemName = item.Name,
+                    Status = failed ? "Failed" : "Complete",
+                    ItemIndex = completed,
+                    TotalItems = totalEnabled
+                });
 
                 if (File.Exists(tempLog))
                     auditLogs[item.Name] = new List<string>(File.ReadAllLines(tempLog));

@@ -15,5 +15,6 @@ namespace win_backup.Models
         public string Src { get; set; }
         public string Dest { get; set; }
         public bool Enabled { get; set; }
+        public int LastExitCode { get; set; } = -1;
     }
 }
