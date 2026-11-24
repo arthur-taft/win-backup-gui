@@ -78,6 +78,40 @@ namespace win_backup.Helpers
             return users;
         }
 
+        public static List<string> GetRunningBrowsers()
+        {
+            var processNames = new Dictionary<string, string>
+            {
+                ["chrome"] = "Chrome",
+                ["msedge"] = "Edge",
+                ["firefox"] = "Firefox"
+            };
+
+            return processNames
+                .Where(p => Process.GetProcessesByName(p.Key).Length > 0)
+                .Select(p => p.Value)
+                .ToList();
+        }
+
+        // Map dest location
+        public static readonly Dictionary<string, string> BrowserFolders = new()
+        {
+            ["Chrome"] = @"AppData\Local\Google\Chrome\User Data",
+            ["Edge"] = @"AppData\Local\Microsoft\Edge\User Data",
+            ["Firefox"] = @"AppData\Roaming\Mozilla\Firefox",
+        };
+
+        // Junk dirs that we don't need
+        private static readonly string[] BrowserExcludedDirs =
+        {
+            "Cache", "Code Cache", "GPUCache", "ShaderCache", "GrShaderCache",
+            "GraphiteDawnCache", "DawnCache", "DawnWebGPUCache", "DawnGraphiteCache",
+            "CacheStorage", "ScriptCache", "Crashpad", "Crash Reports",
+            "component_crx_cache", "Safe Browsing"
+        };
+
+        private static readonly string[] BrowserExcludedFiles = { "lockfile", "parent.lock", "*.tmp" };
+
         // Expose robocopy log path
         public static readonly string TempLogPath = Path.Combine(Path.GetTempPath(), "robo_migration.log");
 
@@ -123,71 +157,23 @@ namespace win_backup.Helpers
                 });
             }
 
-            // Browser profiles
-            // Note we build AppData paths manually from the user's root
-            // because Environment.GetFolderPath() would give the CURRENT user's AppData
-            string localAppData = Path.Combine(sourceRoot, @"AppData\Local");
-            string roamingAppData = Path.Combine(sourceRoot, @"AppData\Roaming");
+            foreach (var browser in BrowserFolders)
+            {
+                string fullPath = Path.Combine(sourceRoot, browser.Value);
+                if (!Directory.Exists(fullPath)) continue;
 
-            items.AddRange(GetChromiumProfiles("Chrome",
-                Path.Combine(localAppData, @"Google\Chrome\User Data")));
-
-            items.AddRange(GetChromiumProfiles("Edge",
-                Path.Combine(localAppData, @"Microsoft\Edge\User Data")));
-
-            items.AddRange(GetFirefoxProfiles(
-                Path.Combine(roamingAppData, @"Mozilla\Firefox\Profiles")));
+                items.Add(new BackupItem
+                {
+                    Name = browser.Key,
+                    Src = fullPath,
+                    Dest = browser.Key,
+                    Enabled = true,
+                    IsBrowser = true,
+                    IsManySmallFiles = true  // skip /J, as before
+                });
+            }
 
             return items;
-        }
-
-        // Handles Chrome and Edge
-        private static List<BackupItem> GetChromiumProfiles(string browserName, string userDataPath)
-        {
-            var profiles = new List<BackupItem>();
-            if (!Directory.Exists(userDataPath)) return profiles;
-
-            foreach (var dir in Directory.GetDirectories(userDataPath))
-            {
-                string folderName = Path.GetFileName(dir);
-                if (folderName == "Default" || Regex.IsMatch(folderName, @"^Profile \d+$"))
-                {
-                    profiles.Add(new BackupItem
-                    {
-                        Name = $@"{browserName}\{folderName}",
-                        Src = dir,
-                        Dest = $@"{browserName}\{folderName}",
-                        Enabled = true
-                    });
-                }
-            }
-
-            return profiles;
-        }
-
-        private static List<BackupItem> GetFirefoxProfiles(string firefoxPath)
-        {
-            var profiles = new List<BackupItem>();
-
-            if (!Directory.Exists(firefoxPath)) return profiles;
-
-            foreach (var dir in Directory.GetDirectories(firefoxPath))
-            {
-                string folderName = Path.GetFileName(dir);
-                if (Regex.IsMatch(folderName, @"^[a-zA-Z0-9]+\.default-release$") ||
-                    Regex.IsMatch(folderName, @"^[a-zA-Z0-9]+\.Profile \d+$"))
-                {
-                    profiles.Add(new BackupItem
-                    {
-                        Name = $@"Firefox\{folderName}",
-                        Src = dir,
-                        Dest = $@"Firefox\{folderName}",
-                        Enabled = true
-                    });
-                }
-            }
-
-            return profiles;
         }
 
         public static List<LargeFileItem> ScanLargeFiles(string path)
@@ -269,11 +255,25 @@ namespace win_backup.Helpers
                     $"/UNILOG:\"{tempLog}\""
                 };
 
-                if (excludedFiles.ContainsKey(item.Name))
+                if (!item.IsManySmallFiles)
+                {
+                    args.Add("/J");
+                }
+
+                if (item.IsBrowser)
+                {
+                    args.Add("/XD");
+                    args.AddRange(BrowserExcludedDirs.Select(d => $"\"{d}\""));
+                }
+
+                var filesToSkip = new List<string>();
+                if (excludedFiles.ContainsKey(item.Name)) filesToSkip.AddRange(excludedFiles[item.Name]);
+                if (item.IsBrowser) filesToSkip.AddRange(BrowserExcludedFiles);
+
+                if (filesToSkip.Count > 0)
                 {
                     args.Add("/XF");
-                    foreach (var file in excludedFiles[item.Name])
-                        args.Add($"\"{file}\"");
+                    args.AddRange(filesToSkip.Select(f => $"\"{f}\""));
                 }
 
                 // --- Launch robocopy hidden ---

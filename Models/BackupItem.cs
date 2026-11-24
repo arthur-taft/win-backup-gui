@@ -16,5 +16,7 @@ namespace win_backup.Models
         public string Dest { get; set; }
         public bool Enabled { get; set; }
         public int LastExitCode { get; set; } = -1;
+        public bool IsBrowser { get; set; }
+        public bool IsManySmallFiles { get; set; }
     }
 }

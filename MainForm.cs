@@ -124,6 +124,23 @@ namespace win_backup
                 return;
             }
 
+            if (_backupItems.Any(i => i.Enabled && i.IsBrowser))
+            {
+                var running = BackupEngine.GetRunningBrowsers();
+                if (running.Count > 0)
+                {
+                    var answer = MessageBox.Show(
+                        $"These browsers are still running: {string.Join(", ", running)}\n\n" +
+                        "Close them for a complete backup. Continuing now will likely fail on locked files.\n\n" +
+                        "Continue anyway?",
+                        "Browsers Running",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Warning);
+
+                    if (answer == DialogResult.No) return;
+                }
+            }
+
             _excludedFiles.Clear();
 
             // --- Large File Audit ---
